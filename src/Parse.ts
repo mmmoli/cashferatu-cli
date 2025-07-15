@@ -49,7 +49,6 @@ export const readCsv = (filename: string) =>
             trim: true,
           }),
         ),
-        E.Effect.tap((v) => console.log("Parsed CSV:", v)),
         E.Effect.flatMap((rows) =>
           E.Effect.forEach(rows, (row) =>
             E.Effect.try({

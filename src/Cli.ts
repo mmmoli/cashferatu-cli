@@ -1,48 +1,67 @@
 import * as cli from "@effect/cli";
 import * as E from "effect";
 import { readCsv } from "./Parse.js";
+import { reduceToPercentiles, runSimulation } from "./Simulation.js";
 
-// const command = cli.Command.make("hello")
-
-// export const run = cli.Command.run(command, {
-//   name: "Hello World",
-//   version: "0.0.0"
-// })
-//
-
-// const cashEventsCsvPath = cli.Args.text({
-//   name: "Path to Cash Event CSV",
-// }).pipe(
-//   cli.Args.withDescription("The path to the CSV file containing cash events"),
-// );
-//
-
+const DEFAULT_CASH_EVENTS_CSV_PATH = "./var/cashevent-template.csv" as const;
 const cashEventsCsvPathOption = cli.Options.file("pathToCashEventsCsv").pipe(
   cli.Options.withDescription(
-    "The path to the CSV file containing cash events [default: ./var/cashevent-template.csv]",
+    `The path to the CSV file containing cash events [default: ${DEFAULT_CASH_EVENTS_CSV_PATH}]`,
   ),
-  cli.Options.withDefault("./var/cashevent-template.csv"),
+  cli.Options.withDefault(DEFAULT_CASH_EVENTS_CSV_PATH),
 );
 
-const listCommand = cli.Command.make(
-  "list",
+const DEFAULT_DATA_POINTS = 200;
+const runCount = cli.Options.integer("runCount").pipe(
+  cli.Options.withDescription(
+    `The number of runs to simulate [default: ${DEFAULT_DATA_POINTS}]`,
+  ),
+  cli.Options.withDefault(DEFAULT_DATA_POINTS),
+);
+
+const DEFAULT_RUN_OUTPUT_PATH = "./var/" as const;
+const runOutputDir = cli.Options.file("outputDir").pipe(
+  cli.Options.withDescription(
+    `The director output runs [default: ${DEFAULT_RUN_OUTPUT_PATH}]`,
+  ),
+  cli.Options.withDefault(DEFAULT_RUN_OUTPUT_PATH),
+);
+
+const simulationsCommand = cli.Command.make("simulations", {
+  csvPath: cashEventsCsvPathOption,
+  outputDir: runOutputDir,
+}).pipe(cli.Command.withDescription("Manages simulation runs."));
+
+const newSimulationCommand = cli.Command.make(
+  "new",
   {
-    csvPath: cashEventsCsvPathOption,
+    runCount,
   },
-  ({ csvPath }) =>
+  ({ runCount }) =>
     E.Effect.gen(function* (_) {
-      yield* E.Console.log("Listing cash events in", csvPath);
-      const cashEvents = yield* _(readCsv(csvPath));
-      yield* E.Console.log("cash Events", cashEvents);
+      const { csvPath } = yield* _(simulationsCommand);
+      const percentiles = yield* _(
+        readCsv(csvPath).pipe(
+          E.Effect.andThen((events) =>
+            runSimulation(events, {
+              runCount,
+            }),
+          ),
+          E.Effect.map((runs) => reduceToPercentiles(runs)),
+        ),
+      );
+
+      yield* E.Console.log("percentiles", percentiles);
     }),
-).pipe(cli.Command.withDescription("List all cash events"));
-// .pipe(
-//   cli.Command.withSubcommands([setMineCommand, removeMineCommand]),
-// );
+).pipe(cli.Command.withDescription("Runs a new simulation."));
 
 const command = cli.Command.make("cashferatu").pipe(
   cli.Command.withDescription("Devilishly smart financial forecasting."),
-  cli.Command.withSubcommands([listCommand]),
+  cli.Command.withSubcommands([
+    simulationsCommand.pipe(
+      cli.Command.withSubcommands([newSimulationCommand]),
+    ),
+  ]),
 );
 
 export const run = cli.Command.run(command, {

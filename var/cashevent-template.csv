@@ -1,6 +1,6 @@
 ID,label,value,date
-1,ACME Invoice 1 of 3,3000,2025-09-03
-2,Payroll March,-2000,2025-03-20
-3,ACME Invoice 2 of 3,3000,2025-10-04
-4,Payroll April,-2000,2025-04-20
-5,ACME Invoice 3 of 3,2000,2025-11-08
+1,ACME Invoice 1 of 3,3000,2025-08-03
+2,Payroll March,-2000,2025-08-20
+3,ACME Invoice 2 of 3,3000,2025-08-04
+4,Payroll April,-2000,2025-08-20
+5,ACME Invoice 3 of 3,2000,2025-08-08
