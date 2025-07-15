@@ -21,7 +21,7 @@ export class CashEvent extends Schema.Class<CashEvent>("CashEvent")({
   ID: Schema.NonEmptyTrimmedString,
   label: Schema.NonEmptyTrimmedString,
   value: Schema.NumberFromString,
-  received: Schema.DateFromString,
+  date: Schema.DateFromString,
 }) {}
 
 /**
@@ -49,10 +49,11 @@ export const readCsv = (filename: string) =>
             trim: true,
           }),
         ),
+        E.Effect.tap((v) => console.log("Parsed CSV:", v)),
         E.Effect.flatMap((rows) =>
           E.Effect.forEach(rows, (row) =>
             E.Effect.try({
-              try: () => Schema.encodeUnknownSync(CashEvent)(row),
+              try: () => Schema.decodeUnknownSync(CashEvent)(row),
               catch: () =>
                 new CashEventDecodeError({
                   data: row,

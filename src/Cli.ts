@@ -32,9 +32,7 @@ const listCommand = cli.Command.make(
   ({ csvPath }) =>
     E.Effect.gen(function* (_) {
       yield* E.Console.log("Listing cash events in", csvPath);
-      const cashEvents = yield* _(readCsv(csvPath)).pipe(
-        E.Effect.catchAll(() => E.Effect.succeed([])),
-      );
+      const cashEvents = yield* _(readCsv(csvPath));
       yield* E.Console.log("cash Events", cashEvents);
     }),
 ).pipe(cli.Command.withDescription("List all cash events"));
