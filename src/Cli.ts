@@ -19,6 +19,14 @@ const runCount = cli.Options.integer("runCount").pipe(
   cli.Options.withDefault(DEFAULT_DATA_POINTS),
 );
 
+const DEFAULT_RUN_LENGTH = 120;
+const runLength = cli.Options.integer("runLength").pipe(
+  cli.Options.withDescription(
+    `The number of days to project into the future [default: ${DEFAULT_RUN_LENGTH}]`,
+  ),
+  cli.Options.withDefault(DEFAULT_RUN_LENGTH),
+);
+
 const DEFAULT_RUN_OUTPUT_PATH = "./var/" as const;
 const runOutputDir = cli.Options.file("outputDir").pipe(
   cli.Options.withDescription(
@@ -36,8 +44,9 @@ const newSimulationCommand = cli.Command.make(
   "new",
   {
     runCount,
+    runLength,
   },
-  ({ runCount }) =>
+  ({ runCount, runLength }) =>
     E.Effect.gen(function* (_) {
       const { csvPath } = yield* _(simulationsCommand);
       const percentiles = yield* _(
@@ -45,6 +54,7 @@ const newSimulationCommand = cli.Command.make(
           E.Effect.andThen((events) =>
             runSimulation(events, {
               runCount,
+              runLength,
             }),
           ),
           E.Effect.map((runs) => reduceToPercentiles(runs)),

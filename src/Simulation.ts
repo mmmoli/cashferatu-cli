@@ -3,6 +3,7 @@ import type { CashEvent } from "./Parse.js";
 
 export type SimulationOptions = {
   runCount: number;
+  runLength: number;
 };
 
 export type Prediction = {
@@ -19,7 +20,7 @@ export const runSimulation = E.Effect.fn("runSimulation")(function* (
   events: CashEvent[],
   opts: SimulationOptions,
 ) {
-  const FORECAST_LENGTH = 120 as const;
+  const FORECAST_LENGTH = opts.runLength;
   const predictions: Prediction[] = [];
 
   // Step 1: Generate predictions
