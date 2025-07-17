@@ -1,5 +1,5 @@
 import * as E from "effect";
-import { CashEvent } from "./Parse.js";
+import type { CashEvent } from "./Parse.js";
 
 export type SimulationOptions = {
   runCount: number;
@@ -38,7 +38,8 @@ export const runSimulation = E.Effect.fn("runSimulation")(function* (
     Array(FORECAST_LENGTH).fill(0),
   );
 
-  const today = new Date();
+  const today = yield* E.DateTime.nowAsDate;
+  today.setHours(0, 0, 0, 0);
 
   for (const prediction of predictions) {
     const dayOffset = dateDiffInDays(today, prediction.occursOn);
