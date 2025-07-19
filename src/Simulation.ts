@@ -1,9 +1,17 @@
 import * as E from "effect";
+import { DateTime } from "effect";
 import type { CashEvent } from "./Parse.js";
+import { applyDateJitter, applyValueJitter, daysFromToday } from "./Util.js";
+
+export const DEFAULT_DATE_VARIANCE_DAYS = 10 as const;
+export const DEFAULT_VALUE_VARIANCE_PERCENT = 30 as const;
+export const DEFAULT_RUN_LENGTH = 30 as const;
 
 export type SimulationOptions = {
   runCount: number;
-  runLength: number;
+  runLength?: number;
+  dateVarianceDays?: number;
+  valueVariancePct?: number;
 };
 
 export type Prediction = {
@@ -12,24 +20,45 @@ export type Prediction = {
   value: number;
 };
 
-const dateDiffInDays = (a: Date, b: Date): number => {
-  return Math.floor((b.getTime() - a.getTime()) / (1000 * 60 * 60 * 24));
-};
-
 export const runSimulation = E.Effect.fn("runSimulation")(function* (
   events: CashEvent[],
   opts: SimulationOptions,
 ) {
-  const FORECAST_LENGTH = opts.runLength;
+  const FORECAST_LENGTH = opts.runLength ?? DEFAULT_RUN_LENGTH;
+  const DATE_VARIANCE_DAYS =
+    opts.dateVarianceDays ?? DEFAULT_DATE_VARIANCE_DAYS;
+  const VALUE_VARIANCE_PERCENT =
+    opts.valueVariancePct ?? DEFAULT_VALUE_VARIANCE_PERCENT;
+
+  const today = yield* E.DateTime.nowAsDate;
+  today.setHours(0, 0, 0, 0);
+
   const predictions: Prediction[] = [];
 
   // Step 1: Generate predictions
   for (const event of events) {
+    if (event.date < today) continue;
+
     for (let run = 0; run < opts.runCount; run++) {
+      const rng = E.Random.make(`${run}-${event.ID}`);
+
+      const jitteredValue = yield* applyValueJitter(
+        event.value,
+        VALUE_VARIANCE_PERCENT,
+      ).pipe(E.Effect.withRandom(rng));
+
+      const jitteredDate = yield* applyDateJitter(
+        DateTime.unsafeFromDate(event.date),
+        DATE_VARIANCE_DAYS,
+      ).pipe(
+        E.Effect.map((dt) => DateTime.toDate(dt)),
+        E.Effect.withRandom(rng),
+      );
+
       predictions.push({
         run,
-        occursOn: event.date,
-        value: event.value,
+        occursOn: jitteredDate,
+        value: jitteredValue,
       });
     }
   }
@@ -39,12 +68,17 @@ export const runSimulation = E.Effect.fn("runSimulation")(function* (
     Array(FORECAST_LENGTH).fill(0),
   );
 
-  const today = yield* E.DateTime.nowAsDate;
-  today.setHours(0, 0, 0, 0);
-
   for (const prediction of predictions) {
-    const dayOffset = dateDiffInDays(today, prediction.occursOn);
-    if (dayOffset >= 0 && dayOffset < FORECAST_LENGTH) {
+    const dayOffset = yield* daysFromToday(
+      DateTime.unsafeFromDate(prediction.occursOn),
+    ).pipe(E.Effect.map(Math.round));
+
+    // Skip past events completely
+    if (dayOffset < 0) {
+      continue;
+    }
+
+    if (dayOffset < FORECAST_LENGTH) {
       runs[prediction.run][dayOffset] += prediction.value;
     }
   }
@@ -67,7 +101,8 @@ const getPercentile = (sorted: number[], percentile: number): number => {
   if (lower === upper) return sorted[lower];
 
   const weight = idx - lower;
-  return sorted[lower] * (1 - weight) + sorted[upper] * weight;
+  const result = sorted[lower] * (1 - weight) + sorted[upper] * weight;
+  return parseFloat(result.toFixed(3));
 };
 
 export type PercentileDay = {
