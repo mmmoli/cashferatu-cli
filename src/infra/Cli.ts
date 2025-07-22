@@ -1,15 +1,15 @@
-import { Path } from "@effect/platform";
 import * as cli from "@effect/cli";
+import { Path } from "@effect/platform";
 import * as Console from "effect/Console";
 import * as Effect from "effect/Effect";
+import { pipe } from "effect/Function";
 import { SimulationService } from "../services/Simulation-Service.js";
 import { parseCashEventsFromCsv } from "./Parse.js";
 import {
+  listReportsFromFS,
   ReportFilenameGenerationService,
   saveSimulationReportToFS,
 } from "./Persist.js";
-import { pipe } from "effect/Function";
-import { file } from "@effect/cli/Args";
 
 const DEFAULT_CASH_EVENTS_CSV_PATH = "./var/cashevent-template.csv" as const;
 const cashEventsCsvPathOption = cli.Options.file("pathToCashEventsCsv").pipe(
@@ -89,11 +89,34 @@ const newSimulationCommand = cli.Command.make(
     }),
 ).pipe(cli.Command.withDescription("Runs a new simulation."));
 
+const listSimulationCommand = cli.Command.make(
+  "list",
+  { output },
+  ({ output }) =>
+    Effect.gen(function* (_) {
+      const reports = yield* _(listReportsFromFS(output));
+
+      const metaDataForTable = reports.map((report) => ({
+        id: report.id,
+        runCount: report.meta.runCount,
+        runLength: report.meta.runLength,
+        runDate: report.meta.runDate.toString(),
+      }));
+
+      yield* _(Console.table(metaDataForTable));
+
+      yield* _(Console.log(`Found ${reports.length} simulation reports.`));
+    }),
+).pipe(cli.Command.withDescription("Lists known Simulation reports."));
+
 const command = cli.Command.make("cashferatu").pipe(
   cli.Command.withDescription("Devilishly smart financial forecasting."),
   cli.Command.withSubcommands([
     simulationsCommand.pipe(
-      cli.Command.withSubcommands([newSimulationCommand]),
+      cli.Command.withSubcommands([
+        newSimulationCommand,
+        listSimulationCommand,
+      ]),
     ),
   ]),
 );

@@ -1,8 +1,12 @@
-import { Path } from "@effect/platform";
 import * as Platform from "@effect/platform";
-import * as Effect from "effect/Effect";
+import { Path } from "@effect/platform";
 import * as Data from "effect/Data";
-import type { SimulationReport } from "../domain/Simulation.js";
+import * as Effect from "effect/Effect";
+import {
+  SimulationReportSchema,
+  type SimulationReport,
+} from "../domain/Simulation.js";
+import { ParseResult, Schema } from "@effect/schema";
 
 export class DirectoryDoesNotExistError extends Data.TaggedError(
   "DirectoryDoesNotExistError",
@@ -11,7 +15,9 @@ export class DirectoryDoesNotExistError extends Data.TaggedError(
   originalError: Error;
 }> {}
 
-export class SaveReportError extends Data.TaggedError("SaveReportError")<{
+export class SaveReportError extends Data.TaggedError(
+  "infra/Persist/SaveReportError",
+)<{
   location: string;
   originalError: Error;
 }> {}
@@ -23,40 +29,39 @@ export class SaveReportError extends Data.TaggedError("SaveReportError")<{
  * @param location - Path to the file system location
  * @returns Effect that resolves to the saved report
  */
-export const saveSimulationReportToFS = Effect.fn(function* (
-  report: SimulationReport,
-  location: string,
-) {
-  const path = yield* Path.Path;
-  const fs = yield* Platform.FileSystem.FileSystem;
-  const json = JSON.stringify(report, null, 2);
-  yield* fs.writeFileString(location, json).pipe(
-    Effect.catchTag("SystemError", (err) => {
-      if (err.reason === "NotFound") {
-        const dir = path.dirname(location);
-        fs.makeDirectory(dir, { recursive: true }).pipe(
-          Effect.flatMap(() => fs.writeFileString(location, json)),
+export const saveSimulationReportToFS = Effect.fn("saveSimulationReportToFS")(
+  function* (report: SimulationReport, location: string) {
+    const path = yield* Path.Path;
+    const fs = yield* Platform.FileSystem.FileSystem;
+    const json = JSON.stringify(report, null, 2);
+    yield* fs.writeFileString(location, json).pipe(
+      Effect.catchTag("SystemError", (err) => {
+        if (err.reason === "NotFound") {
+          const dir = path.dirname(location);
+          fs.makeDirectory(dir, { recursive: true }).pipe(
+            Effect.flatMap(() => fs.writeFileString(location, json)),
+          );
+          return Effect.succeed(void 0);
+        }
+        return Effect.fail(
+          new SaveReportError({
+            location,
+            originalError: err,
+          }),
         );
-        return Effect.succeed(void 0);
-      }
-      return Effect.fail(
-        new SaveReportError({
-          location,
-          originalError: err,
-        }),
-      );
-    }),
-    Effect.catchAll((err) =>
-      Effect.fail(
-        new SaveReportError({
-          location,
-          originalError: err as Error,
-        }),
+      }),
+      Effect.catchAll((err) =>
+        Effect.fail(
+          new SaveReportError({
+            location,
+            originalError: err as Error,
+          }),
+        ),
       ),
-    ),
-  );
-  return location;
-});
+    );
+    return location;
+  },
+);
 
 export class ReportFilenameGenerationService extends Effect.Service<ReportFilenameGenerationService>()(
   "infra/Persist/ReportFilenameGenerationService",
@@ -67,3 +72,47 @@ export class ReportFilenameGenerationService extends Effect.Service<ReportFilena
         `simulation-${id}.json`,
   },
 ) {}
+
+export class ReadReportsError extends Data.TaggedError(
+  "infra/Persist/ReadReportsError",
+)<{
+  readonly filename: string;
+  readonly originalError: Error | ParseResult.ParseError; // Include ParseError for schema decoding
+}> {}
+
+export const listReportsFromFS = Effect.fn("listReportsFromFS")(function* (
+  directory: string,
+) {
+  const fs = yield* Platform.FileSystem.FileSystem;
+  const path = yield* Platform.Path.Path;
+
+  const files = yield* fs
+    .readDirectory(directory)
+    .pipe(Effect.map((files) => files.filter((f) => f.endsWith(".json"))));
+
+  const decodedReports = yield* Effect.forEach(
+    files,
+    (filename) => {
+      const fullPath = path.join(directory, filename);
+      return fs.readFileString(fullPath).pipe(
+        Effect.map((contents) => {
+          return Schema.decodeUnknownSync(
+            Schema.parseJson(SimulationReportSchema as any),
+          )(contents);
+        }),
+        Effect.catchAll((err) =>
+          // Catch both file system errors and schema parsing errors
+          Effect.fail(
+            new ReadReportsError({
+              filename,
+              originalError: err as Error | ParseResult.ParseError,
+            }),
+          ),
+        ),
+      );
+    },
+    { concurrency: "unbounded" }, // Consider concurrency for file reads
+  );
+
+  return decodedReports as Array<SimulationReport>;
+});

@@ -5,9 +5,9 @@ import * as NodeRuntime from "@effect/platform-node/NodeRuntime";
 import * as Effect from "effect/Effect";
 import * as Layer from "effect/Layer";
 import { run } from "./infra/Cli.js";
+import { ReportFilenameGenerationService } from "./infra/Persist.js";
 import { GetPercentile } from "./services/Percentiles.js";
 import { SimulationService } from "./services/Simulation-Service.js";
-import { ReportFilenameGenerationService } from "./infra/Persist.js";
 
 run(process.argv).pipe(
 	Effect.provide(
