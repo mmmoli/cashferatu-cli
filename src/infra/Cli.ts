@@ -19,12 +19,6 @@ const cashEventsCsvPathOption = cli.Options.file("pathToCashEventsCsv").pipe(
   cli.Options.withDefault(DEFAULT_CASH_EVENTS_CSV_PATH),
 );
 
-const DEFAULT_OUTPUT_DIR = "./simulations/";
-const output = cli.Options.text("outputDir").pipe(
-  cli.Options.withDescription(`Output directory to save the report`),
-  cli.Options.withDefault(DEFAULT_OUTPUT_DIR),
-);
-
 const DEFAULT_DATA_POINTS = 200;
 const runCount = cli.Options.integer("runCount").pipe(
   cli.Options.withDescription(
@@ -41,7 +35,7 @@ const runLength = cli.Options.integer("runLength").pipe(
   cli.Options.withDefault(DEFAULT_RUN_LENGTH),
 );
 
-const DEFAULT_RUN_OUTPUT_PATH = "./var/" as const;
+const DEFAULT_RUN_OUTPUT_PATH = "./simulations/" as const;
 const runOutputDir = cli.Options.file("outputDir").pipe(
   cli.Options.withDescription(
     `The directory to output runs [default: ${DEFAULT_RUN_OUTPUT_PATH}]`,
@@ -59,10 +53,10 @@ const newSimulationCommand = cli.Command.make(
   {
     runCount,
     runLength,
-    output,
   },
-  ({ runCount, runLength, output }) =>
+  ({ runCount, runLength }) =>
     Effect.gen(function* (_) {
+      const { outputDir } = yield* _(simulationsCommand);
       const { csvPath } = yield* _(simulationsCommand);
       const path = yield* Path.Path;
       const Simulation = yield* _(SimulationService);
@@ -80,7 +74,7 @@ const newSimulationCommand = cli.Command.make(
 
       yield* pipe(
         Effect.succeed(generateFilename(report)),
-        Effect.map((filename) => path.join(output, filename)),
+        Effect.map((filename) => path.join(outputDir, filename)),
         Effect.tap((filePath) => saveSimulationReportToFS(report, filePath)),
         Effect.tap((filePath) =>
           Console.log(`done! Report saved as ${filePath}`),
@@ -89,24 +83,22 @@ const newSimulationCommand = cli.Command.make(
     }),
 ).pipe(cli.Command.withDescription("Runs a new simulation."));
 
-const listSimulationCommand = cli.Command.make(
-  "list",
-  { output },
-  ({ output }) =>
-    Effect.gen(function* (_) {
-      const reports = yield* _(listReportsFromFS(output));
+const listSimulationCommand = cli.Command.make("list", {}, () =>
+  Effect.gen(function* (_) {
+    const { outputDir } = yield* _(simulationsCommand);
+    const reports = yield* _(listReportsFromFS(outputDir));
 
-      const metaDataForTable = reports.map((report) => ({
-        id: report.id,
-        runCount: report.meta.runCount,
-        runLength: report.meta.runLength,
-        runDate: report.meta.runDate.toString(),
-      }));
+    const metaDataForTable = reports.map((report) => ({
+      id: report.id,
+      runCount: report.meta.runCount,
+      runLength: report.meta.runLength,
+      runDate: report.meta.runDate.toString(),
+    }));
 
-      yield* _(Console.table(metaDataForTable));
+    yield* _(Console.table(metaDataForTable));
 
-      yield* _(Console.log(`Found ${reports.length} simulation reports.`));
-    }),
+    yield* _(Console.log(`Found ${reports.length} simulation reports.`));
+  }),
 ).pipe(cli.Command.withDescription("Lists known Simulation reports."));
 
 const command = cli.Command.make("cashferatu").pipe(
