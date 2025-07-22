@@ -7,6 +7,7 @@ import * as Layer from "effect/Layer";
 import { run } from "./infra/Cli.js";
 import { GetPercentile } from "./services/Percentiles.js";
 import { SimulationService } from "./services/Simulation-Service.js";
+import { ReportFilenameGenerationService } from "./infra/Persist.js";
 
 run(process.argv).pipe(
 	Effect.provide(
@@ -14,7 +15,8 @@ run(process.argv).pipe(
 			NodeContext.layer,
 			SimulationService.Default,
 			GetPercentile.Default,
+			ReportFilenameGenerationService.Default,
 		),
 	),
-	NodeRuntime.runMain({ disableErrorReporting: true }),
+	NodeRuntime.runMain({ disableErrorReporting: false }),
 );
