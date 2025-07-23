@@ -3,7 +3,7 @@ import * as Effect from "effect/Effect";
 import * as Layer from "effect/Layer";
 import * as Schema from "effect/Schema";
 import { TestContext } from "effect/TestContext";
-import { CashEvent } from "../Cash-Event.js";
+import { CashEventSchema } from "../Cash-Event.js";
 
 const TestEnvironmentLayer = Layer.mergeAll(TestContext);
 
@@ -14,13 +14,14 @@ describe("CashEvent", () => {
 				const validData = {
 					ID: "EVENT-001",
 					label: "Salary Payment",
-					value: "5000.50",
+					value: 5000.5,
 					date: "2024-01-15",
 				};
 
-				const result = yield* _(Schema.decodeUnknown(CashEvent)(validData));
+				const result = yield* _(
+					Schema.decodeUnknown(CashEventSchema)(validData),
+				);
 
-				expect(result).toBeInstanceOf(CashEvent);
 				expect(result.ID).toBe("EVENT-001");
 				expect(result.label).toBe("Salary Payment");
 				expect(result.value).toBe(5000.5);
@@ -34,11 +35,13 @@ describe("CashEvent", () => {
 				const validData = {
 					ID: "EVENT-002",
 					label: "Rent Payment",
-					value: "-1500.00",
+					value: -1500.0,
 					date: "2024-01-01",
 				};
 
-				const result = yield* _(Schema.decodeUnknown(CashEvent)(validData));
+				const result = yield* _(
+					Schema.decodeUnknown(CashEventSchema)(validData),
+				);
 
 				expect(result.value).toBe(-1500.0);
 				expect(result.label).toBe("Rent Payment");
@@ -50,12 +53,12 @@ describe("CashEvent", () => {
 				const invalidData = {
 					ID: "  EVENT-003  ",
 					label: "  Bonus Payment  ",
-					value: "2000",
+					value: 2000,
 					date: "2024-02-01",
 				};
 
 				const result = yield* _(
-					Schema.decodeUnknown(CashEvent)(invalidData).pipe(Effect.flip),
+					Schema.decodeUnknown(CashEventSchema)(invalidData).pipe(Effect.flip),
 				);
 
 				expect(result).toBeDefined();
@@ -77,11 +80,13 @@ describe("CashEvent", () => {
 					const validData = {
 						ID: "EVENT-DATE",
 						label: "Date Test",
-						value: "100",
+						value: 100,
 						date: testCase.date,
 					};
 
-					const result = yield* _(Schema.decodeUnknown(CashEvent)(validData));
+					const result = yield* _(
+						Schema.decodeUnknown(CashEventSchema)(validData),
+					);
 					expect(result.date.toISOString()).toBe(testCase.expected);
 				}
 			}).pipe(Effect.provide(TestEnvironmentLayer)),
@@ -94,12 +99,12 @@ describe("CashEvent", () => {
 				const invalidData = {
 					ID: "",
 					label: "Test Event",
-					value: "100",
-					date: "2024-01-01",
+					value: 100,
+					date: "2024-01-01T00:00:00.000Z",
 				};
 
 				const result = yield* _(
-					Schema.decodeUnknown(CashEvent)(invalidData).pipe(Effect.flip),
+					Schema.decodeUnknown(CashEventSchema)(invalidData).pipe(Effect.flip),
 				);
 
 				expect(result).toBeDefined();
@@ -111,12 +116,12 @@ describe("CashEvent", () => {
 				const invalidData = {
 					ID: "   ",
 					label: "Test Event",
-					value: "100",
-					date: "2024-01-01",
+					value: 100,
+					date: "2024-01-01T00:00:00.000Z",
 				};
 
 				const result = yield* _(
-					Schema.decodeUnknown(CashEvent)(invalidData).pipe(Effect.flip),
+					Schema.decodeUnknown(CashEventSchema)(invalidData).pipe(Effect.flip),
 				);
 
 				expect(result).toBeDefined();
@@ -126,14 +131,14 @@ describe("CashEvent", () => {
 		it.effect("should fail with empty label", () =>
 			Effect.gen(function* (_) {
 				const invalidData = {
-					ID: "EVENT-001",
+					ID: "EVENT-005",
 					label: "",
-					value: "100",
-					date: "2024-01-01",
+					value: 200,
+					date: "2024-05-01",
 				};
 
 				const result = yield* _(
-					Schema.decodeUnknown(CashEvent)(invalidData).pipe(Effect.flip),
+					Schema.decodeUnknown(CashEventSchema)(invalidData).pipe(Effect.flip),
 				);
 
 				expect(result).toBeDefined();
@@ -150,7 +155,7 @@ describe("CashEvent", () => {
 				};
 
 				const result = yield* _(
-					Schema.decodeUnknown(CashEvent)(invalidData).pipe(Effect.flip),
+					Schema.decodeUnknown(CashEventSchema)(invalidData).pipe(Effect.flip),
 				);
 
 				expect(result).toBeDefined();
@@ -164,14 +169,15 @@ describe("CashEvent", () => {
 					const invalidData = {
 						ID: "EVENT-001",
 						label: "Test Event",
-						value: "100",
-						date: "invalid-date",
+						value: 100,
+						date: "Not a date",
 					};
 
 					// DateFromString will create an Invalid Date object rather than failing
-					const result = yield* _(Schema.decodeUnknown(CashEvent)(invalidData));
+					const result = yield* _(
+						Schema.decodeUnknown(CashEventSchema)(invalidData),
+					);
 
-					expect(result).toBeInstanceOf(CashEvent);
 					expect(Number.isNaN(result.date.getTime())).toBe(true);
 				}).pipe(Effect.provide(TestEnvironmentLayer)),
 		);
@@ -184,7 +190,7 @@ describe("CashEvent", () => {
 				};
 
 				const result = yield* _(
-					Schema.decodeUnknown(CashEvent)(invalidData).pipe(Effect.flip),
+					Schema.decodeUnknown(CashEventSchema)(invalidData).pipe(Effect.flip),
 				);
 
 				expect(result).toBeDefined();
@@ -193,30 +199,13 @@ describe("CashEvent", () => {
 	});
 
 	describe("Instance methods", () => {
-		it.effect("should create instance with constructor", () =>
-			Effect.gen(function* (_) {
-				const cashEvent = new CashEvent({
-					ID: "EVENT-CONSTRUCTOR",
-					label: "Constructor Test",
-					value: 999.99,
-					date: new Date("2024-03-01"),
-				});
-
-				expect(cashEvent).toBeInstanceOf(CashEvent);
-				expect(cashEvent.ID).toBe("EVENT-CONSTRUCTOR");
-				expect(cashEvent.label).toBe("Constructor Test");
-				expect(cashEvent.value).toBe(999.99);
-				expect(cashEvent.date).toBeInstanceOf(Date);
-			}).pipe(Effect.provide(TestEnvironmentLayer)),
-		);
-
 		it.effect("should be JSON serializable", () =>
 			Effect.gen(function* (_) {
-				const cashEvent = new CashEvent({
+				const cashEvent = Schema.decodeUnknownSync(CashEventSchema)({
 					ID: "EVENT-JSON",
 					label: "JSON Test",
 					value: 250.75,
-					date: new Date("2024-04-01"),
+					date: new Date("2024-04-01").toISOString(),
 				});
 
 				const jsonString = JSON.stringify(cashEvent);
@@ -236,11 +225,13 @@ describe("CashEvent", () => {
 				const validData = {
 					ID: "EVENT-LARGE",
 					label: "Large Value",
-					value: "999999999.99",
+					value: 999999999.99,
 					date: "2024-01-01",
 				};
 
-				const result = yield* _(Schema.decodeUnknown(CashEvent)(validData));
+				const result = yield* _(
+					Schema.decodeUnknown(CashEventSchema)(validData),
+				);
 				expect(result.value).toBe(999999999.99);
 			}).pipe(Effect.provide(TestEnvironmentLayer)),
 		);
@@ -250,11 +241,13 @@ describe("CashEvent", () => {
 				const validData = {
 					ID: "EVENT-SMALL",
 					label: "Small Value",
-					value: "0.01",
+					value: 0.01,
 					date: "2024-01-01",
 				};
 
-				const result = yield* _(Schema.decodeUnknown(CashEvent)(validData));
+				const result = yield* _(
+					Schema.decodeUnknown(CashEventSchema)(validData),
+				);
 				expect(result.value).toBe(0.01);
 			}).pipe(Effect.provide(TestEnvironmentLayer)),
 		);
@@ -263,12 +256,14 @@ describe("CashEvent", () => {
 			Effect.gen(function* (_) {
 				const validData = {
 					ID: "EVENT-ZERO",
-					label: "Zero Value",
-					value: "0",
-					date: "2024-01-01",
+					label: "Zero Value Test",
+					value: 0,
+					date: "2024-08-01",
 				};
 
-				const result = yield* _(Schema.decodeUnknown(CashEvent)(validData));
+				const result = yield* _(
+					Schema.decodeUnknown(CashEventSchema)(validData),
+				);
 				expect(result.value).toBe(0);
 			}).pipe(Effect.provide(TestEnvironmentLayer)),
 		);
@@ -278,11 +273,13 @@ describe("CashEvent", () => {
 				const validData = {
 					ID: "EVENT-LEAP",
 					label: "Leap Year",
-					value: "100",
+					value: 100,
 					date: "2024-02-29",
 				};
 
-				const result = yield* _(Schema.decodeUnknown(CashEvent)(validData));
+				const result = yield* _(
+					Schema.decodeUnknown(CashEventSchema)(validData),
+				);
 				expect(result.date.toISOString()).toBe("2024-02-29T00:00:00.000Z");
 			}).pipe(Effect.provide(TestEnvironmentLayer)),
 		);

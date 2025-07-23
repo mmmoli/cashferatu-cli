@@ -3,7 +3,7 @@ import * as csv from "csv-parse/sync";
 import * as Data from "effect/Data";
 import * as Effect from "effect/Effect";
 import * as Schema from "effect/Schema";
-import { CashEvent } from "../domain/Cash-Event.js";
+import { CashEventSchema } from "../domain/Cash-Event.js";
 
 export class CsvFileNotFoundError extends Data.TaggedError(
 	"CsvFileNotFoundError",
@@ -42,7 +42,7 @@ export const parseCashEventsFromCsv = Effect.fn(function* (filename: string) {
 		Effect.flatMap((rows) =>
 			Effect.forEach(rows, (row) =>
 				Effect.try({
-					try: () => Schema.decodeUnknownSync(CashEvent)(row),
+					try: () => Schema.decodeUnknownSync(CashEventSchema)(row),
 					catch: () =>
 						new CashEventDecodeError({
 							data: row,

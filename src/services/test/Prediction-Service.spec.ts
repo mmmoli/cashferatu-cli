@@ -3,8 +3,13 @@ import * as DateTime from "effect/DateTime";
 import * as Effect from "effect/Effect";
 import * as Layer from "effect/Layer";
 import * as Random from "effect/Random";
+import * as Schema from "effect/Schema";
 import { TestContext } from "effect/TestContext";
-import { CashEvent } from "../../domain/Cash-Event.js";
+import {
+	type CashEvent,
+	CashEventId,
+	CashEventSchema,
+} from "../../domain/Cash-Event.js";
 import {
 	DefaultSimulationConfig,
 	type SimulationOptions,
@@ -25,11 +30,11 @@ const createCashEvent = (
 ): CashEvent => {
 	const normalizedDate = new Date(date);
 	normalizedDate.setHours(0, 0, 0, 0);
-	return new CashEvent({
-		ID: id,
+	return Schema.decodeUnknownSync(CashEventSchema)({
+		ID: CashEventId.make(id),
 		label,
 		value,
-		date: normalizedDate,
+		date: normalizedDate.toISOString(),
 	});
 };
 

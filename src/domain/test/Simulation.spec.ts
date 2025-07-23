@@ -3,7 +3,7 @@ import * as Effect from "effect/Effect";
 import * as Layer from "effect/Layer";
 import * as Schema from "effect/Schema";
 import { TestContext } from "effect/TestContext";
-import { CashEvent } from "../Cash-Event.js";
+import { CashEventSchema } from "../Cash-Event.js";
 import {
 	DefaultSimulationConfig,
 	type PercentileDay,
@@ -307,13 +307,13 @@ describe("Simulation Domain", () => {
 						{
 							ID: "EVENT-001",
 							label: "Salary",
-							value: "5000",
+							value: 5000,
 							date: "2024-01-01",
 						},
 						{
 							ID: "EVENT-002",
 							label: "Rent",
-							value: "-1500",
+							value: -1500,
 							date: "2024-01-01",
 						},
 					],
@@ -374,7 +374,6 @@ describe("Simulation Domain", () => {
 				expect(result.runs).toHaveLength(2);
 
 				// Verify cash events are properly decoded
-				expect(result.cashEvents[0]).toBeInstanceOf(CashEvent);
 				expect(result.cashEvents[0].value).toBe(5000);
 				expect(result.cashEvents[1].value).toBe(-1500);
 
@@ -492,11 +491,11 @@ describe("Simulation Domain", () => {
 					p90: 11000,
 				};
 
-				const cashEvent = new CashEvent({
+				const cashEvent = Schema.decodeUnknownSync(CashEventSchema)({
 					ID: "TEST-EVENT",
 					label: "Test",
 					value: 1000,
-					date: new Date("2024-01-01"),
+					date: "2024-01-01",
 				});
 
 				// These should all compile and work together
