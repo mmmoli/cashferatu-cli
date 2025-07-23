@@ -19,75 +19,120 @@ export const renderReportToHTML = Effect.fn("renderReportToHTML")(function* (
   const p75 = report.forecast.map((f) => f.p75);
   const p90 = report.forecast.map((f) => f.p90);
 
-  const chartData = {
-    labels,
-    datasets: [
-      {
-        label: "P10",
-        data: p10,
-        borderColor: "rgba(255, 99, 132, 1)",
-        fill: false,
-        tension: 0.1,
-      },
-      {
-        label: "P25",
-        data: p25,
-        borderColor: "rgba(255, 159, 64, 1)",
-        fill: false,
-        tension: 0.1,
-      },
-      {
-        label: "P50",
-        data: p50,
-        borderColor: "rgba(255, 205, 86, 1)",
-        fill: false,
-        tension: 0.1,
-      },
-      {
-        label: "P75",
-        data: p75,
-        borderColor: "rgba(75, 192, 192, 1)",
-        fill: false,
-        tension: 0.1,
-      },
-      {
-        label: "P90",
-        data: p90,
-        borderColor: "rgba(54, 162, 235, 1)",
-        fill: false,
-        tension: 0.1,
-      },
-    ],
-  };
-
   const html = `
   <html>
     <head>
-      <title>Simulation Report</title>
+      <title>Cashferatu Forecast</title>
       <script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
       <style>
-        body { font-family: sans-serif; padding: 1rem; }
-        pre { background: #f0f0f0; padding: 1rem; border-radius: 8px; }
-        canvas { max-width: 100%; height: 400px; }
+        body {
+          font-family: 'Georgia', serif;
+          background: #fffaf8;
+          color: #1e1b18;
+          padding: 2rem;
+          line-height: 1.6;
+        }
+        h1 {
+          font-family: 'Gothic A1', sans-serif;
+          font-weight: 600;
+          color: crimson;
+        }
+        canvas {
+          max-width: 100%;
+          height: 400px;
+          margin-bottom: 2rem;
+        }
+        pre {
+          background: #f7f2ef;
+          padding: 1rem;
+          border-radius: 8px;
+          font-size: 0.85rem;
+          overflow-x: auto;
+        }
       </style>
     </head>
     <body>
-      <h1>Simulation Report</h1>
+      <h1>Cashferatu Forecast</h1>
       <canvas id="forecastChart"></canvas>
       <script>
         const ctx = document.getElementById('forecastChart').getContext('2d');
         const chart = new Chart(ctx, {
           type: 'line',
-          data: ${JSON.stringify(chartData)},
+          data: {
+            labels: ${JSON.stringify(labels)},
+            datasets: [
+              {
+                label: "Fog Start (P10)",
+                data: ${JSON.stringify(p10)},
+                borderColor: "transparent",
+                backgroundColor: "rgba(100, 100, 100, 0.15)",
+                fill: "+1",
+                pointRadius: 0,
+                tension: 0.3
+              },
+              {
+                label: "Fog End (P90)",
+                data: ${JSON.stringify(p90)},
+                borderColor: "transparent",
+                backgroundColor: "rgba(100, 100, 100, 0.15)",
+                fill: false,
+                pointRadius: 0,
+                tension: 0.3
+              },
+              {
+                label: "Candlelight Start (P25)",
+                data: ${JSON.stringify(p25)},
+                borderColor: "transparent",
+                backgroundColor: "rgba(255, 205, 86, 0.2)",
+                fill: "+1",
+                pointRadius: 0,
+                tension: 0.3
+              },
+              {
+                label: "Candlelight End (P75)",
+                data: ${JSON.stringify(p75)},
+                borderColor: "transparent",
+                backgroundColor: "rgba(255, 205, 86, 0.2)",
+                fill: false,
+                pointRadius: 0,
+                tension: 0.3
+              },
+              {
+                label: "🩸 Blood Median (P50)",
+                data: ${JSON.stringify(p50)},
+                borderColor: "crimson",
+                backgroundColor: "transparent",
+                borderWidth: 2,
+                pointRadius: 3,
+                fill: false,
+                tension: 0.3
+              }
+            ]
+          },
           options: {
             responsive: true,
+            plugins: {
+              legend: { position: 'bottom' },
+              tooltip: { mode: 'index', intersect: false },
+            },
+            interaction: {
+              mode: 'nearest',
+              axis: 'x',
+              intersect: false
+            },
             scales: {
-              y: { beginAtZero: true }
+              y: {
+                beginAtZero: true,
+                title: { display: true, text: 'Balance (£)' }
+              },
+              x: {
+                title: { display: true, text: 'Day' }
+              }
             }
           }
         });
       </script>
-      <h2>Raw Report</h2>
+      <h2>Raw Simulation Report</h2>
       <pre>${JSON.stringify(report, null, 2)}</pre>
     </body>
   </html>
