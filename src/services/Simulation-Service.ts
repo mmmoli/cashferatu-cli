@@ -41,6 +41,7 @@ export class SimulationService extends Effect.Service<SimulationService>()(
             runCount,
             runLength,
             runDate: now,
+            startingBalance: opts.startingBalance ?? 0,
           },
         });
       });

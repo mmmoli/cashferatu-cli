@@ -61,6 +61,7 @@ export const SimulationReportSchema = S.Struct({
     runCount: S.Number,
     runLength: S.Number,
     runDate: S.DateTimeUtc,
+    startingBalance: S.Number,
   }),
   cashEvents: S.Array(CashEventSchema),
   forecast: S.Array(PercentileDaySchema),
