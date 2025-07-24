@@ -247,6 +247,116 @@ describe("Prediction Service", () => {
       }).pipe(Effect.provide(TestEnvironmentLayer)),
     );
 
+    it.effect("should apply starting balance to first day", () =>
+      Effect.gen(function* (_) {
+        const computeBalance = yield* _(ComputeBalanceForRunFn);
+        const today = yield* DateTime.nowAsDate;
+
+        const predictions = [
+          { run: 0, occursOn: today, value: 100 }, // day 0
+          {
+            run: 0,
+            occursOn: new Date(today.getTime() + 24 * 60 * 60 * 1000),
+            value: 50,
+          }, // day 1
+        ];
+
+        const byRun = new Map();
+        byRun.set(0, predictions);
+
+        const balanceSeriesList = yield* _(
+          computeBalance({
+            runCount: 1,
+            runLength: 5,
+            byRun,
+            startingBalance: 1000,
+          }),
+        );
+
+        expect(balanceSeriesList).toHaveLength(1);
+        // Starting balance (1000) + first day event (100) = 1100, then cumulative
+        expect(balanceSeriesList[0]).toEqual([1100, 1150, 1150, 1150, 1150]);
+      }).pipe(Effect.provide(TestEnvironmentLayer)),
+    );
+
+    it.effect("should handle negative starting balance", () =>
+      Effect.gen(function* (_) {
+        const computeBalance = yield* _(ComputeBalanceForRunFn);
+        const today = yield* DateTime.nowAsDate;
+
+        const predictions = [
+          { run: 0, occursOn: today, value: 200 }, // day 0
+        ];
+
+        const byRun = new Map();
+        byRun.set(0, predictions);
+
+        const balanceSeriesList = yield* _(
+          computeBalance({
+            runCount: 1,
+            runLength: 3,
+            byRun,
+            startingBalance: -500,
+          }),
+        );
+
+        expect(balanceSeriesList).toHaveLength(1);
+        // Starting balance (-500) + first day event (200) = -300
+        expect(balanceSeriesList[0]).toEqual([-300, -300, -300]);
+      }).pipe(Effect.provide(TestEnvironmentLayer)),
+    );
+
+    it.effect("should apply starting balance to each run independently", () =>
+      Effect.gen(function* (_) {
+        const computeBalance = yield* _(ComputeBalanceForRunFn);
+        const today = yield* DateTime.nowAsDate;
+
+        const run0Predictions = [{ run: 0, occursOn: today, value: 100 }];
+        const run1Predictions = [{ run: 1, occursOn: today, value: 200 }];
+
+        const byRun = new Map();
+        byRun.set(0, run0Predictions);
+        byRun.set(1, run1Predictions);
+
+        const balanceSeriesList = yield* _(
+          computeBalance({
+            runCount: 2,
+            runLength: 3,
+            byRun,
+            startingBalance: 500,
+          }),
+        );
+
+        expect(balanceSeriesList).toHaveLength(2);
+        // Each run gets the same starting balance
+        expect(balanceSeriesList[0]).toEqual([600, 600, 600]); // 500 + 100
+        expect(balanceSeriesList[1]).toEqual([700, 700, 700]); // 500 + 200
+      }).pipe(Effect.provide(TestEnvironmentLayer)),
+    );
+
+    it.effect("should work with zero starting balance (default behavior)", () =>
+      Effect.gen(function* (_) {
+        const computeBalance = yield* _(ComputeBalanceForRunFn);
+        const today = yield* DateTime.nowAsDate;
+
+        const predictions = [{ run: 0, occursOn: today, value: 150 }];
+        const byRun = new Map();
+        byRun.set(0, predictions);
+
+        const balanceSeriesList = yield* _(
+          computeBalance({
+            runCount: 1,
+            runLength: 3,
+            byRun,
+            startingBalance: 0,
+          }),
+        );
+
+        expect(balanceSeriesList).toHaveLength(1);
+        expect(balanceSeriesList[0]).toEqual([150, 150, 150]);
+      }).pipe(Effect.provide(TestEnvironmentLayer)),
+    );
+
     it.effect("should handle predictions outside run length", () =>
       Effect.gen(function* (_) {
         const computeBalance = yield* _(ComputeBalanceForRunFn);
@@ -408,6 +518,160 @@ describe("Prediction Service", () => {
         Effect.withRandom(Random.make("deterministic-seed")),
         Effect.provide(TestEnvironmentLayer),
       ),
+    );
+
+    it.effect("should apply custom starting balance from options", () =>
+      Effect.gen(function* (_) {
+        const service = yield* _(PredictionsService);
+        const futureDate = yield* createFutureDate(1);
+
+        const events = [createCashEvent("1", "Income", 1000, futureDate)];
+
+        const customOptions: SimulationOptions = {
+          runCount: 2,
+          runLength: 3,
+          dateVarianceDays: 0,
+          valueVariancePct: 0,
+          startingBalance: 5000,
+        };
+
+        const result = yield* _(service.generate(events, customOptions));
+
+        expect(result.runs).toHaveLength(2);
+
+        // Each run should start with the custom starting balance + events
+        result.runs.forEach((run) => {
+          expect(run.balanceSeries).toHaveLength(3);
+          // First day: startingBalance (5000), event happens on day 1: startingBalance + event value (1000) = 6000
+          expect(run.balanceSeries[0]).toBe(5000);
+          expect(run.balanceSeries[1]).toBe(6000);
+          expect(run.balanceSeries[2]).toBe(6000);
+        });
+      }).pipe(
+        Effect.withRandom(Random.make("starting-balance-seed")),
+        Effect.provide(TestEnvironmentLayer),
+      ),
+    );
+
+    it.effect("should use default starting balance when not specified", () =>
+      Effect.gen(function* (_) {
+        const service = yield* _(PredictionsService);
+        const defaultConfig = yield* _(DefaultSimulationConfig);
+        const futureDate = yield* createFutureDate(1);
+
+        const events = [createCashEvent("1", "Income", 500, futureDate)];
+
+        const result = yield* _(
+          service.generate(events, {
+            runCount: 1,
+            runLength: 5,
+            dateVarianceDays: 0,
+            valueVariancePct: 0,
+          }),
+        );
+
+        // Should use default starting balance (0)
+        expect(result.runs[0].balanceSeries[0]).toBe(0); // day 0: starting balance only
+        expect(result.runs[0].balanceSeries[1]).toBe(500); // day 1: 0 + 500
+        expect(result.runs[0].balanceSeries[2]).toBe(500); // day 2: maintains balance
+        expect(defaultConfig.startingBalance).toBe(0);
+      }).pipe(
+        Effect.withRandom(Random.make("default-balance-seed")),
+        Effect.provide(TestEnvironmentLayer),
+      ),
+    );
+
+    it.effect("should handle negative starting balance correctly", () =>
+      Effect.gen(function* (_) {
+        const service = yield* _(PredictionsService);
+        const futureDate1 = yield* createFutureDate(1);
+        const futureDate2 = yield* createFutureDate(2);
+
+        const events = [
+          createCashEvent("1", "Income", 2000, futureDate1),
+          createCashEvent("2", "Expense", -500, futureDate2),
+        ];
+
+        const customOptions: SimulationOptions = {
+          runCount: 1,
+          runLength: 5,
+          dateVarianceDays: 0,
+          valueVariancePct: 0,
+          startingBalance: -1000,
+        };
+
+        const result = yield* _(service.generate(events, customOptions));
+
+        const balanceSeries = result.runs[0].balanceSeries;
+
+        // Day 0: -1000 (starting balance only)
+        expect(balanceSeries[0]).toBe(-1000);
+        // Day 1: -1000 + 2000 (income) = 1000
+        expect(balanceSeries[1]).toBe(1000);
+        // Day 2: 1000 + (-500) (expense) = 500
+        expect(balanceSeries[2]).toBe(500);
+        // Days 3-4: maintain balance
+        expect(balanceSeries[3]).toBe(500);
+        expect(balanceSeries[4]).toBe(500);
+      }).pipe(
+        Effect.withRandom(Random.make("negative-balance-seed")),
+        Effect.provide(TestEnvironmentLayer),
+      ),
+    );
+
+    it.effect(
+      "should apply starting balance consistently across multiple runs",
+      () =>
+        Effect.gen(function* (_) {
+          const service = yield* _(PredictionsService);
+          const futureDate = yield* createFutureDate(1);
+
+          const events = [createCashEvent("1", "Payment", 300, futureDate)];
+
+          const customOptions: SimulationOptions = {
+            runCount: 3,
+            runLength: 3,
+            dateVarianceDays: 0,
+            valueVariancePct: 0,
+            startingBalance: 700,
+          };
+
+          const result = yield* _(service.generate(events, customOptions));
+
+          expect(result.runs).toHaveLength(3);
+
+          // All runs should have the same starting balance behavior
+          result.runs.forEach((run, index) => {
+            expect(run.balanceSeries[0]).toBe(700); // starting balance on day 0
+            expect(run.balanceSeries[1]).toBe(1000); // 700 + 300 on day 1
+            expect(run.balanceSeries[2]).toBe(1000); // maintains balance on day 2
+            expect(run.runIndex).toBe(index);
+          });
+        }).pipe(
+          Effect.withRandom(Random.make("multi-run-balance-seed")),
+          Effect.provide(TestEnvironmentLayer),
+        ),
+    );
+
+    it.effect("should work with zero starting balance and empty events", () =>
+      Effect.gen(function* (_) {
+        const service = yield* _(PredictionsService);
+
+        const customOptions: SimulationOptions = {
+          runCount: 2,
+          runLength: 3,
+          startingBalance: 0,
+        };
+
+        const result = yield* _(service.generate([], customOptions));
+
+        expect(result.runs).toHaveLength(2);
+
+        result.runs.forEach((run) => {
+          expect(run.balanceSeries).toEqual([0, 0, 0]);
+          expect(run.predictions).toHaveLength(0);
+        });
+      }).pipe(Effect.provide(TestEnvironmentLayer)),
     );
   });
 });

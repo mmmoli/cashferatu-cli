@@ -1,6 +1,7 @@
 import * as cli from "@effect/cli";
 import { Path } from "@effect/platform";
 import * as Console from "effect/Console";
+import * as Option from "effect/Option";
 import * as Effect from "effect/Effect";
 import { pipe } from "effect/Function";
 import { SimulationService } from "../services/Simulation-Service.js";
@@ -36,6 +37,12 @@ const runLength = cli.Options.integer("runLength").pipe(
   cli.Options.withDefault(DEFAULT_RUN_LENGTH),
 );
 
+const startingBalance = cli.Options.optional(
+  cli.Options.integer("startingBalance").pipe(
+    cli.Options.withDescription(`The number to start the balance [default: 0]`),
+  ),
+);
+
 const DEFAULT_RUN_OUTPUT_PATH = "./simulations/" as const;
 const runOutputDir = cli.Options.file("outputDir").pipe(
   cli.Options.withDescription(
@@ -54,8 +61,9 @@ const newSimulationCommand = cli.Command.make(
   {
     runCount,
     runLength,
+    startingBalance,
   },
-  ({ runCount, runLength }) =>
+  ({ runCount, runLength, startingBalance }) =>
     Effect.gen(function* (_) {
       const { outputDir } = yield* _(simulationsCommand);
       const { csvPath } = yield* _(simulationsCommand);
@@ -68,6 +76,7 @@ const newSimulationCommand = cli.Command.make(
             Simulation.generate(events, {
               runCount,
               runLength,
+              startingBalance: Option.getOrUndefined(startingBalance),
             }),
           ),
         ),

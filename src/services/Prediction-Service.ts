@@ -86,6 +86,13 @@ export class GroupPredictionsByRunIndexFn extends Effect.Service<GroupPrediction
   },
 ) {}
 
+export interface ComputeBalanceForRunFnParams {
+  runCount: number;
+  runLength: number;
+  byRun: Map<number, Prediction[]>;
+  startingBalance?: number;
+}
+
 export class ComputeBalanceForRunFn extends Effect.Service<ComputeBalanceForRunFn>()(
   "services/PredictionService/ComputeBalanceForRunFn",
   {
@@ -95,11 +102,8 @@ export class ComputeBalanceForRunFn extends Effect.Service<ComputeBalanceForRunF
         runCount,
         runLength,
         byRun,
-      }: {
-        runCount: number;
-        runLength: number;
-        byRun: Map<number, Prediction[]>;
-      }) =>
+        startingBalance = 0,
+      }: ComputeBalanceForRunFnParams) =>
         Effect.forEach(
           Array.from({ length: runCount }, (_, runIndex) => runIndex),
           (runIndex) =>
@@ -122,8 +126,12 @@ export class ComputeBalanceForRunFn extends Effect.Service<ComputeBalanceForRunF
                   return acc;
                 }, Array(runLength).fill(0));
 
-              for (let i = 1; i < balanceSeries.length; i++) {
-                balanceSeries[i] += balanceSeries[i - 1];
+              for (let i = 0; i < balanceSeries.length; i++) {
+                if (i === 0) {
+                  balanceSeries[0] += startingBalance;
+                } else {
+                  balanceSeries[i] += balanceSeries[i - 1];
+                }
               }
 
               return balanceSeries;
@@ -158,6 +166,8 @@ export class PredictionsService extends Effect.Service<PredictionsService>()(
           opts.valueVariancePct ?? defaultConfig.valueVariancePct;
         const DATE_VARIANCE =
           opts.dateVarianceDays ?? defaultConfig.dateVarianceDays;
+        const STARTING_BALANCE =
+          opts.startingBalance ?? defaultConfig.startingBalance;
 
         const predictions = yield* generatePredictions({
           events,
@@ -170,9 +180,10 @@ export class PredictionsService extends Effect.Service<PredictionsService>()(
         const byRun = groupByRunIndex(predictions);
 
         const balanceSeriesList = yield* computeBalance({
+          byRun,
           runCount: RUN_COUNT,
           runLength: RUN_LENGTH,
-          byRun,
+          startingBalance: STARTING_BALANCE,
         });
 
         const runs: SimulationRun[] = Array.from(
